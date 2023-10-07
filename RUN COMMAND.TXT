@@ -1,0 +1,18 @@
+train
+
+python train_single.py --epochs 50 --batch_size 128 --clip 1.0 --lr 1e-3 --embed_dim 300 --freeze False --space_joiner True --dropout 0.2 --loss_fn triplet --max_len 30 --PRE_TRAINED_MODEL_NAME 'emilyalsentzer/Bio_ClinicalBERT' --model_path './ckpt/best_model_v6_triplet' --train_dir './data/14k_data.csv' --use_aux True --use_aug_data True
+
+
+test
+
+python evaluate_single.py --embed_dim 300 --freeze False --space_joiner True --dropout 0.2 --loss_fn triplet --max_len 30 --PRE_TRAINED_MODEL_NAME 'emilyalsentzer/Bio_ClinicalBERT' --model_path './ckpt/best_model_v6_triplet' --train_dir './data/100k_data.csv'
+
+
+Inference
+
+python inference.py --embed_dim 300 --PRE_TRAINED_MODEL_NAME 'emilyalsentzer/Bio_ClinicalBERT' --model_path './ckpt/best_model_v6_triplet'
+
+python train_single.py --epochs 50 --batch_size 16 --clip 1.0 --lr 1e-3 --embed_dim 768 --freeze False --space_joiner False --dropout 0.2 --loss_fn triplet --max_len 30 --PRE_TRAINED_MODEL_NAME "SamLowe/roberta-base-go_emotions" --model_path './ckpt/best_model_v6_triplet' --train_dir './data/triplet_dataset.csv' --use_aux True --use_aug_data True
+
+
+python train_single_1.py --epochs 50 --batch_size 16 --clip 1.0 --lr 1e-4 --embed_dim 768 --freeze False --space_joiner True --dropout 0.2 --loss_fn triplet --max_len 30 --PRE_TRAINED_MODEL_NAME "SamLowe/roberta-base-go_emotions" --model_path './ckpt/best_model_v6_triplet' --train_dir 'MELD_data/triplet_dataset.csv' --use_aux True --use_aug_data False --val_dir 'MELD_data/dev_triplet_dataset.csv'
