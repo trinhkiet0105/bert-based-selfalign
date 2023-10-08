@@ -128,7 +128,8 @@ def train_epoch(model, data_loader, loss_fn, optimizer , device, config, textwri
 def eval_model(model , data_loader, loss_fn, device):
     model.eval()
     losses = []
-    for step, batch in enumerate(tqdm(data_loader, desc="Evaluating")):
+    progress_bar = tqdm(enumerate(data_loader), total=len(data_loader), position=0, leave=True, desc="Evaluating")
+    for step, batch in progress_bar:
         # Anchor
         anchor_ids = batch["anchor_ids"].to(device)
         anchor_attention_mask = batch["anchor_attention_mask"].to(device)
@@ -259,6 +260,7 @@ if __name__ == '__main__':
          )
         print(f'Validation loss {val_loss}')
         if best_loss > val_loss:
+            print(f'Val improve from {best_loss} to {val_loss}. Saving Model ... ')
             torch.save(model.state_dict(), str(config.model_path + f'_epoch_{epoch+1}'))
             best_epoch = epoch+1
             best_loss = val_loss
