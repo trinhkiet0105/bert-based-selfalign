@@ -1,7 +1,12 @@
 import torch
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizer, RobertaTokenizer,AutoTokenizer
+from typing import Dict, List, Tuple, Union
+from torch.nn.utils.rnn import pad_sequence
 
+import os
+import pickle
 
 class GPReviewDataset(Dataset):
 
@@ -167,7 +172,7 @@ def create_triplet_data_loader(df, tokenizer, max_len, batch_size, mode='train')
         )
 
 def get_data_df(train_dir,test_dir,config):
-    df_test = pd.read_csv(test_dir)
+    df_test = pd.read_csv(test_dir,index_col=False)
     df_test['is_duplicate'] = [1] * len(df_test)
     # df_test2 = pd.read_csv('../test_final.csv')
     # df_test = df_test[['question1','question2','is_duplicate']]
@@ -195,3 +200,59 @@ def get_data_df(train_dir,test_dir,config):
 
     print(df_train.shape, df_test.shape) # question1, question2, is_duplicate
     return df_train, df_test
+
+
+class MELDDataset(Dataset):
+    def __init__(self, filepath, tokenizer):
+        self.data = pd.read_csv(filepath)
+        self.tokenizer = tokenizer
+        self.labels = self.data['Emotion'].astype('category').cat.codes
+        self.label_classes = self.data['Emotion'].astype('category').cat.categories
+        self.num_labels = len(self.label_classes)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        text = self.data['Utterance'].iloc[idx]
+        label = self.labels.iloc[idx]
+        
+        encoding = self.tokenizer.encode_plus(
+            text,
+            truncation=True,
+            padding=False,
+            return_tensors='pt',
+            return_token_type_ids=False,
+            return_attention_mask=True,
+            add_special_tokens=True
+        )
+        
+        return {
+            'input_ids': encoding['input_ids'].squeeze(),
+            'attention_mask': encoding['attention_mask'].squeeze(),
+            'labels': torch.tensor(label, dtype=torch.long)
+        }
+    
+def collate_fn(batch):
+    # Get the maximum length of input_ids in the current batch
+    max_length = max([len(item['input_ids']) for item in batch])
+    
+    # Pad the sequences to the max_length
+    padded_input_ids = pad_sequence([item['input_ids'] for item in batch], batch_first=True, padding_value=0)
+    padded_attention_mask = pad_sequence([item['attention_mask'] for item in batch], batch_first=True, padding_value=0)
+    labels = torch.stack([item['labels'] for item in batch])
+    
+    return {
+        'input_ids': padded_input_ids,
+        'attention_mask': padded_attention_mask,
+        'labels': labels
+    }
+
+def get_MELD_dataloader(filepath, tokenizer, train:bool):
+    dataset = MELDDataset(filepath, tokenizer)
+    if train :
+        dataloader = DataLoader(dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
+    else:
+        dataloader = DataLoader(dataset, batch_size=16, shuffle=False, collate_fn=collate_fn)
+    return dataloader
+    
