@@ -4,6 +4,8 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import BertTokenizer, RobertaTokenizer,AutoTokenizer
 from typing import Dict, List, Tuple, Union
 from torch.nn.utils.rnn import pad_sequence
+import numpy as np
+from torch.utils.data import Sampler
 
 import os
 import pickle
@@ -248,11 +250,51 @@ def collate_fn(batch):
         'labels': labels
     }
 
-def get_MELD_dataloader(filepath, tokenizer, train:bool):
-    dataset = MELDDataset(filepath, tokenizer)
-    if train :
-        dataloader = DataLoader(dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
-    else:
-        dataloader = DataLoader(dataset, batch_size=16, shuffle=False, collate_fn=collate_fn)
-    return dataloader
     
+def get_MELD_dataloader(filepath, tokenizer, train: bool, batch_size=8):
+    dataset = MELDDataset(filepath, tokenizer)
+    if train:
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    else:
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
+    return dataloader
+
+
+class IEMOCAPAudioDataset(Dataset):
+    def __init__(self, filepath):
+        with open(filepath, "rb") as train_file:
+            self.data_list = pickle.load(train_file)
+
+    def __len__(self):
+        return len(self.data_list)
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        _, _, waveform, label = self.data_list[index].values()
+
+        if isinstance(waveform, torch.Tensor):
+            waveform = waveform.clone().detach()
+        else:  # assuming it's a numpy array
+            waveform = torch.tensor(waveform)
+
+        label = torch.tensor(label, dtype=torch.long).squeeze()  # assuming label is an integer
+
+        return waveform, label
+    
+def IEMOCAPAudioDataset_collate_fn(batch):
+    waveforms, labels = zip(*batch)
+
+    # Ensure waveforms are 1D
+    waveforms = [wf.squeeze() for wf in waveforms if wf.ndim > 1]
+
+    waveforms_padded = pad_sequence(waveforms, batch_first=True, padding_value=0)
+    labels = torch.tensor(labels)
+    return waveforms_padded, labels
+
+    
+def get_IEMOCAPAudio_dataloader(filepath, train: bool, batch_size=8):
+    dataset = IEMOCAPAudioDataset(filepath)
+    if train:
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=IEMOCAPAudioDataset_collate_fn)
+    else:
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=IEMOCAPAudioDataset_collate_fn)
+    return dataloader
